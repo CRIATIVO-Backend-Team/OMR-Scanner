@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="qrscan_bus_App">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SUC Code Scanner</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+
+  <!-- AngularJS + QR Scanner -->
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.gstatic.com" rel="preconnect">
+  <link
+    href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Nunito:300,300i,400,400i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i"
+    rel="stylesheet">
+
+  <!-- Vendor CSS Files -->
+  <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
+  <link href="assets/vendor/quill/quill.snow.css" rel="stylesheet">
+  <link href="assets/vendor/quill/quill.bubble.css" rel="stylesheet">
+  <link href="assets/vendor/remixicon/remixicon.css" rel="stylesheet">
+  <link href="assets/vendor/simple-datatables/style.css" rel="stylesheet">
+
+  <!-- Template Main CSS File -->
+  <link href="assets/css/style.css" rel="stylesheet">
+
+  <style>
+    body {
+      background: #f8f9fa;
+    }
+
+    #qr-reader {
+      width: 100%;
+      max-width: 350px;
+      margin: auto;
+      border: 2px solid #0d6efd;
+      border-radius: 10px;
+    }
+
+    .scanner-box {
+      margin-top: 20px;
+    }
+
+    .qr-btn {
+      width: 110px;
+      height: 110px;
+      background: #f9fcff;
+      border: 1px solid #f1f1f1;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .qr-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .qr-btn i {
+      font-size: 3rem;
+      color: #0d6efd;
+    }
+  </style>
+</head>
+
+<body ng-controller="qrscan_bus_Ctrl">
+  <div class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-md-4">
+        <div class="card p-2">
+          <div class="card-body">
+
+            <h4 class="text-center card-title pb-2 border-bottom mb-4">SUC Code Scanner</h4>
+
+            <!-- Stop Button -->
+            <div class="d-flex justify-content-center align-items-center gap-3 flex-wrap">
+              <button class="btn btn-danger btn-sm d-flex align-items-center justify-content-center"
+                ng-click="stopQrScanner()" ng-show="scannerVisible">
+                <i class="bi bi-stop-circle me-2"></i> Stop
+              </button>
+            </div>
+
+            <!-- Manual Input -->
+            <div class="mt-1">
+              <label class="form-label mb-1" >Enter Exam Id</label>
+              <input type="text" class="form-control" placeholder="Enter Exam ID" ng-model="examId" />
+
+              <label class="form-label mb-1 mt-3" >Enter SUC Code</label>
+              <div class="d-flex gap-3">
+                <input type="text" class="form-control" placeholder="Enter SUC Code manually" ng-model="sucCode" ng-change="storeSuc()" />
+                <div class="btn btn-light p-1 px-2" ng-click="startQrScanner()">
+                  <i class="bi bi-qr-code-scan text-primary" style="font-size: 16px;"></i>
+                </div>
+              </div>
+            </div>
+
+            <!-- Next Button -->
+            <div class="text-center mt-3">
+              <button class="btn btn-primary w-100" ng-click="nextStep()" ng-disabled="!examId || !sucCode">
+                Next
+              </button>
+            </div>
+
+            <!-- QR Scanner -->
+            <div class="scanner-box text-center mt-4" ng-show="scannerVisible">
+              <div id="qr-reader"></div>
+            </div>
+
+            <!-- SUC Code Display -->
+            <!-- <div class="alert alert-info mt-4 text-center" ng-if="sucCode">
+              <strong>SUC Code:</strong> {{ sucCode }}
+            </div> -->
+
+            <!-- Error Message -->
+            <div class="alert alert-danger p-1 text-danger text-start small mt-3 text-center" ng-if="errorMessage">
+              <i class="bi bi-exclamation-triangle"></i> {{ errorMessage }}
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var app = angular.module('qrscan_bus_App', []);
+    app.controller('qrscan_bus_Ctrl', function ($scope) {
+      $scope.scannerVisible = false;
+      $scope.sucCode = null;   // Separate model for SUC Code
+      $scope.examId = null;     // Separate model for Exam ID
+      $scope.errorMessage = null;
+      let qrScanner = null;
+
+      // Start QR Scanner
+      $scope.startQrScanner = function () {
+        $scope.errorMessage = null;
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          $scope.errorMessage = "Camera not supported. Use Chrome/HTTPS.";
+          $scope.$applyAsync();
+          return;
+        }
+
+        $scope.scannerVisible = true;
+
+        if (!qrScanner) qrScanner = new Html5Qrcode("qr-reader");
+
+        qrScanner.start(
+          { facingMode: { exact: "environment" } },
+          { fps: 10, qrbox: 250 },
+          function (decodedText) {
+            $scope.$apply(() => {
+              $scope.sucCode = decodedText.trim(); // Fill SUC code automatically
+              $scope.scannerVisible = false;
+              localStorage.setItem("sucCode", $scope.sucCode);
+            });
+            qrScanner.stop().catch(err => console.error("Stop failed", err));
+          },
+          function (errorMessage) {
+            console.warn("QR scan error", errorMessage);
+          }
+        ).catch(err => {
+          console.error("Camera start failed", err);
+          $scope.$apply(() => {
+            $scope.errorMessage = "Unable to access camera.";
+            $scope.scannerVisible = false;
+          });
+        });
+      };
+
+      // Stop QR Scanner
+      $scope.stopQrScanner = function () {
+        if (qrScanner) {
+          qrScanner.stop().then(() => $scope.$apply(() => $scope.scannerVisible = false))
+                       .catch(err => console.error("Stop failed", err));
+        }
+      };
+
+      // Store manual SUC input
+      $scope.storeSuc = function () {
+        if ($scope.sucCode && $scope.sucCode.trim() !== '') {
+          localStorage.setItem("sucCode", $scope.sucCode.trim());
+        }
+      };
+
+      // Next Step
+      $scope.nextStep = function () {
+        if ($scope.examId && $scope.examId.trim() !== '' && $scope.sucCode && $scope.sucCode.trim() !== '') {
+          localStorage.setItem("examId", $scope.examId.trim());
+          localStorage.setItem("sucCode", $scope.sucCode.trim());
+          window.location.href = "upload.html";
+        } else {
+          alert("Please enter both Exam ID and SUC Code.");
+        }
+      };
+    });
+  </script>
+
+  <!-- Vendor JS Files -->
+  <script src="assets/vendor/apexcharts/apexcharts.min.js"></script>
+  <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="assets/vendor/chart.js/chart.umd.js"></script>
+  <script src="assets/vendor/echarts/echarts.min.js"></script>
+  <script src="assets/vendor/quill/quill.js"></script>
+  <script src="assets/vendor/simple-datatables/simple-datatables.js"></script>
+  <script src="assets/vendor/tinymce/tinymce.min.js"></script>
+  <script src="assets/vendor/php-email-form/validate.js"></script>
+
+  <!-- Template Main JS File -->
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
