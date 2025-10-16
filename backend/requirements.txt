@@ -8,3 +8,4 @@ numpy
 imutils
 pymongo
 python-dotenv
+pdf2image

@@ -12,6 +12,7 @@ from PIL import Image, ImageOps
 from typing import List, Dict, Tuple
 from pymongo import MongoClient
 from pdf2image import convert_from_path 
+from fastapi.responses import RedirectResponse
 
 # --- Setup ---
 logger = logging.getLogger(__name__)
@@ -22,6 +23,8 @@ client = MongoClient(mongo_url)
 db = client["omr_database"]
 collection = db["omr_results"]
 
+os.makedirs("uploads", exist_ok=True)
+os.makedirs("inputs", exist_ok=True)
 app = FastAPI(title="OMR Sheet Processor")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
@@ -225,12 +228,17 @@ def convert_mobile_to_pc(mobile_path, pc_out="pc_style.jpg"):
     clean = Image.new(image.mode, image.size)
     clean.putdata(list(image.getdata()))
 
+    # ✅ Convert RGBA → RGB before saving as JPEG (JPEG can't handle transparency)
+    if clean.mode == "RGBA":
+        clean = clean.convert("RGB")
+
     # Save compressed JPEG (like PC export)
     clean.save(pc_out, "JPEG", quality=70, optimize=True)
     print(f"Converted: {pc_out}")
     return pc_out
 
-    
+
+
 @app.post("/process/{suc}/{examID}")
 async def process_sheet(file: UploadFile = File(...), suc: str = "", examID: str = "") -> JSONResponse:
     temp_name = "input_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
